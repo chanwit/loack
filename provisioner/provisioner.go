@@ -230,9 +230,68 @@ func (t *Target) Manager(ctx context.Context, opts Options) (acktypes.AWSResourc
 	return rm, opts, nil
 }
 
-// maxReconcileAttempts bounds the convergence loop so a resource whose desired
-// and observed state never agree cannot spin forever.
-const maxReconcileAttempts = 10
+// reconcileTimeout bounds Apply's wait-by-default loop: loack keeps reconciling
+// and polling a resource that is still transitioning (e.g. an EKS cluster in
+// CREATING) until it converges or this elapses.
+const reconcileTimeout = 30 * time.Minute
+
+// pollInterval is how often Apply re-reads a resource whose spec matches but
+// whose lifecycle status is still transitioning.
+const pollInterval = 10 * time.Second
+
+// pendingStates are lifecycle status/state values (lowercased) that mean a
+// resource is still transitioning toward ready. Terminal values (active,
+// available, failed, ...) and resources with no such field are treated as done,
+// so loack only waits for genuinely async resources and never hangs on a simple
+// one like an S3 bucket (which has no lifecycle status field).
+var pendingStates = map[string]bool{
+	"creating": true, "pending": true, "provisioning": true, "activating": true,
+	"updating": true, "modifying": true, "configuring": true, "starting": true,
+	"upgrading": true, "restoring": true, "rebooting": true, "resetting": true,
+	"snapshotting": true, "backing-up": true, "create_in_progress": true,
+	"update_in_progress": true, "in_progress": true,
+}
+
+// pendingStatus reports whether r exposes a lifecycle status/state field still
+// in a transitioning value (e.g. EKS Cluster.Status.Status == "CREATING", NAT
+// gateway Status.State == "pending"). Resources without such a field return
+// false. Used by Apply to wait for async creates to reach a terminal state.
+func pendingStatus(r acktypes.AWSResource) bool {
+	v := reflect.ValueOf(r.RuntimeObject())
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return false
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return false
+	}
+	st := v.FieldByName("Status")
+	for st.IsValid() && st.Kind() == reflect.Ptr {
+		if st.IsNil() {
+			return false
+		}
+		st = st.Elem()
+	}
+	if !st.IsValid() || st.Kind() != reflect.Struct {
+		return false
+	}
+	for _, name := range []string{"Status", "State"} {
+		f := st.FieldByName(name)
+		for f.IsValid() && f.Kind() == reflect.Ptr {
+			if f.IsNil() {
+				f = reflect.Value{}
+				break
+			}
+			f = f.Elem()
+		}
+		if f.IsValid() && f.Kind() == reflect.String && pendingStates[strings.ToLower(f.String())] {
+			return true
+		}
+	}
+	return false
+}
 
 // maxRequeueBackoff caps how long we honor an ACK requeue delay, keeping a
 // one-off provision responsive.
@@ -266,7 +325,12 @@ func (t *Target) Apply(ctx context.Context, rm acktypes.AWSResourceManager, hook
 
 	emit(hook, EventRefreshing, addr, "")
 
-	for attempt := 1; attempt <= maxReconcileAttempts; attempt++ {
+	// Wait by default: keep reconciling, and poll a resource whose spec already
+	// matches but whose lifecycle status is still transitioning, until it
+	// converges or the timeout elapses -- so one apply carries a long async
+	// create like an EKS cluster all the way to ACTIVE.
+	deadline := time.Now().Add(reconcileTimeout)
+	for time.Now().Before(deadline) {
 		observed, err := rm.ReadOne(ctx, current)
 		switch {
 		case errors.Is(err, ackerr.NotFound):
@@ -320,6 +384,14 @@ func (t *Target) Apply(ctx context.Context, rm acktypes.AWSResourceManager, hook
 		}
 		delta := t.descriptor.Delta(eff, observed)
 		if len(delta.Differences) == 0 {
+			// Spec matches. If the resource is still transitioning (e.g. EKS
+			// CREATING), wait and re-read; otherwise it has converged.
+			if pendingStatus(observed) {
+				if serr := sleep(ctx, pollInterval); serr != nil {
+					return nil, serr
+				}
+				continue
+			}
 			id, _, _ := Metadata(latest)
 			switch action {
 			case ActionCreated:
@@ -445,23 +517,46 @@ func (t *Target) Delete(ctx context.Context, rm acktypes.AWSResourceManager, hoo
 	}
 	id, _, _ := Metadata(latest)
 	emit(hook, EventDestroying, addr, id)
-	// Some resources delete asynchronously and requeue until the AWS API
-	// reports them gone; loop on the requeue signal as the controller would.
-	for attempt := 1; attempt <= maxReconcileAttempts; attempt++ {
-		_, err := rm.Delete(ctx, latest)
-		if wait, ok := requeueAfter(err); ok {
-			if serr := sleep(ctx, wait); serr != nil {
-				return nil, serr
+	// Issue the delete, then wait until the resource is actually gone before
+	// reporting it deleted. Some resources delete asynchronously (an EKS cluster,
+	// a NAT gateway), and a dependent -- e.g. the subnet that holds a NAT
+	// gateway's network interface -- cannot be deleted until this one is fully
+	// gone. Bounded by reconcileTimeout so a stuck delete can't hang forever.
+	deadline := time.Now().Add(reconcileTimeout)
+	issued, gone := false, false
+	for time.Now().Before(deadline) && !gone {
+		if !issued {
+			_, derr := rm.Delete(ctx, latest)
+			switch {
+			case errors.Is(derr, ackerr.NotFound):
+				gone = true
+				continue
+			case derr == nil:
+				issued = true
+			default:
+				if _, ok := requeueAfter(derr); !ok {
+					return nil, derr
+				}
+				issued = true
 			}
+		}
+		if _, rerr := rm.ReadOne(ctx, latest); errors.Is(rerr, ackerr.NotFound) {
+			gone = true
 			continue
+		} else if rerr != nil {
+			if _, ok := requeueAfter(rerr); !ok {
+				return nil, rerr
+			}
 		}
-		if err != nil {
-			return nil, err
+		if serr := sleep(ctx, pollInterval); serr != nil {
+			return nil, serr
 		}
-		emit(hook, EventDestroyed, addr, id)
-		return &Result{Action: ActionDeleted}, nil
 	}
-	return &Result{Action: ActionDeleted}, errStillReconciling
+	if !gone {
+		return &Result{Action: ActionDeleted}, errStillReconciling
+	}
+	emit(hook, EventDestroyed, addr, id)
+	return &Result{Action: ActionDeleted}, nil
 }
 
 // Marshal renders an AWSResource (the latest known CR, spec+status) as YAML.
@@ -731,6 +826,11 @@ func (t *Target) effectiveDesired(latest AWSResource) (AWSResource, error) {
 		"kind":       dm["kind"],
 		"metadata":   dm["metadata"],
 		"spec":       deepMerge(lSpec, dSpec), // user (dSpec) overrides observed (lSpec)
+		// Carry the observed status so a follow-up Update has the server-assigned
+		// identifiers (e.g. a subnet's Status.SubnetID, needed by the second-pass
+		// ModifySubnetAttribute for mapPublicIPOnLaunch). Without it those calls
+		// fail with "missing required field".
+		"status": lm["status"],
 	}
 	effJSON, err := json.Marshal(effective)
 	if err != nil {

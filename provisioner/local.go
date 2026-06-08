@@ -45,7 +45,7 @@ func (l *localProvider) capabilities() (provider.Response, error) {
 }
 
 func (l *localProvider) plan(ctx context.Context, req provider.Request) (provider.Response, error) {
-	target, rm, err := l.bind(ctx, req)
+	target, rm, err := l.bind(ctx, req, true)
 	if err != nil {
 		return provider.Response{}, err
 	}
@@ -69,7 +69,7 @@ func (l *localProvider) plan(ctx context.Context, req provider.Request) (provide
 }
 
 func (l *localProvider) apply(ctx context.Context, req provider.Request, hook provider.Hook) (provider.Response, error) {
-	target, rm, err := l.bind(ctx, req)
+	target, rm, err := l.bind(ctx, req, true)
 	if err != nil {
 		return provider.Response{}, err
 	}
@@ -92,7 +92,7 @@ func (l *localProvider) apply(ctx context.Context, req provider.Request, hook pr
 }
 
 func (l *localProvider) delete(ctx context.Context, req provider.Request, hook provider.Hook) (provider.Response, error) {
-	target, rm, err := l.bind(ctx, req)
+	target, rm, err := l.bind(ctx, req, false)
 	if err != nil {
 		return provider.Response{}, err
 	}
@@ -110,7 +110,7 @@ func (l *localProvider) delete(ctx context.Context, req provider.Request, hook p
 }
 
 func (l *localProvider) read(ctx context.Context, req provider.Request) (provider.Response, error) {
-	target, rm, err := l.bind(ctx, req)
+	target, rm, err := l.bind(ctx, req, true)
 	if err != nil {
 		return provider.Response{}, err
 	}
@@ -126,9 +126,12 @@ func (l *localProvider) read(ctx context.Context, req provider.Request) (provide
 	return resp, nil
 }
 
-// bind loads the target, builds its manager from the request options, and
-// resolves references from the supplied snapshot.
-func (l *localProvider) bind(ctx context.Context, req provider.Request) (*Target, AWSResourceManager, error) {
+// bind loads the target and builds its manager from the request options. When
+// resolveRefs is set it also resolves "...Ref" fields from the supplied
+// snapshot. Delete skips that: the state object it operates on already carries
+// the resolved identifiers, and a referenced resource may already be gone (which
+// would otherwise fail ref resolution mid-teardown).
+func (l *localProvider) bind(ctx context.Context, req provider.Request, resolveRefs bool) (*Target, AWSResourceManager, error) {
 	target, err := LoadBytes(req.Object)
 	if err != nil {
 		return nil, nil, err
@@ -137,8 +140,10 @@ func (l *localProvider) bind(ctx context.Context, req provider.Request) (*Target
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := target.ResolveReferences(ctx, rm, refLookup(req.Refs)); err != nil {
-		return nil, nil, err
+	if resolveRefs {
+		if err := target.ResolveReferences(ctx, rm, refLookup(req.Refs)); err != nil {
+			return nil, nil, err
+		}
 	}
 	return target, rm, nil
 }
