@@ -13,6 +13,9 @@ spec:
   vpcRef:
     from:
       name: s0-vpc
+  routeTableRefs:
+    - from:
+        name: s0-public-rt
   tags:
     - key: Name
       value: eks-cluster-public-1
@@ -30,6 +33,9 @@ spec:
   vpcRef:
     from:
       name: s0-vpc
+  routeTableRefs:
+    - from:
+        name: s0-public-rt
   tags:
     - key: Name
       value: eks-cluster-public-2
@@ -46,6 +52,9 @@ spec:
   vpcRef:
     from:
       name: s0-vpc
+  routeTableRefs:
+    - from:
+        name: s0-private-rt
   tags:
     - key: Name
       value: eks-cluster-private-1
@@ -62,6 +71,9 @@ spec:
   vpcRef:
     from:
       name: s0-vpc
+  routeTableRefs:
+    - from:
+        name: s0-private-rt
   tags:
     - key: Name
       value: eks-cluster-private-2

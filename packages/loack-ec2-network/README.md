@@ -48,5 +48,7 @@ This is the first of the EKS-foundation packages; apply it before
 [`loack-eks-cluster`](../loack-eks-cluster), whose EKS cluster references these
 subnets by name.
 
-> Subnet ↔ route-table **associations** are not modeled by the ACK `ec2`
-> `RouteTable` CR; associate them out of band if your workloads need it.
+Each subnet is associated with its route table via the subnet's
+`routeTableRefs` (public → public RT → IGW, private → private RT → NAT), so
+nodes in the private subnets get outbound egress — required for an EKS node
+group to pull images and join.
