@@ -17,6 +17,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	smithy "github.com/aws/smithy-go"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/yaml"
@@ -438,6 +439,31 @@ var errStillReconciling = errors.New("resource provisioned but not yet fully con
 // ErrStillReconciling reports whether err is the soft not-yet-converged signal.
 func ErrStillReconciling(err error) bool { return errors.Is(err, errStillReconciling) }
 
+// isNotFound reports whether err means the AWS resource does not exist. ACK's
+// generated sdkFind maps most "missing" responses to ackerr.NotFound, but some
+// services instead surface the raw AWS API error -- e.g. ec2 DescribeSubnets on
+// a deleted id returns InvalidSubnetID.NotFound, EIP DescribeAddresses returns
+// InvalidAllocationID.NotFound. During teardown those mean "already gone", so we
+// also treat any smithy API error whose code denotes absence as NotFound.
+func isNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ackerr.NotFound) {
+		return true
+	}
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		code := apiErr.ErrorCode()
+		// Covers Invalid<Thing>ID.NotFound, ResourceNotFoundException,
+		// NoSuchEntity, NoSuchBucket, ...NotFoundException, etc.
+		if strings.Contains(code, "NotFound") || strings.Contains(code, "NoSuch") {
+			return true
+		}
+	}
+	return false
+}
+
 // requeueAfter reports whether err is an ACK requeue signal and, if so, how long
 // to wait before reconciling again (clamped to maxRequeueBackoff).
 func requeueAfter(err error) (time.Duration, bool) {
@@ -509,7 +535,7 @@ func (t *Target) Get(ctx context.Context, rm acktypes.AWSResourceManager) (*Resu
 func (t *Target) Delete(ctx context.Context, rm acktypes.AWSResourceManager, hook Hook) (*Result, error) {
 	addr := t.Address()
 	latest, err := rm.ReadOne(ctx, t.desired)
-	if errors.Is(err, ackerr.NotFound) {
+	if isNotFound(err) {
 		return &Result{Action: ActionAbsent}, nil
 	}
 	if err != nil {
@@ -528,7 +554,7 @@ func (t *Target) Delete(ctx context.Context, rm acktypes.AWSResourceManager, hoo
 		if !issued {
 			_, derr := rm.Delete(ctx, latest)
 			switch {
-			case errors.Is(derr, ackerr.NotFound):
+			case isNotFound(derr):
 				gone = true
 				continue
 			case derr == nil:
@@ -540,7 +566,7 @@ func (t *Target) Delete(ctx context.Context, rm acktypes.AWSResourceManager, hoo
 				issued = true
 			}
 		}
-		if _, rerr := rm.ReadOne(ctx, latest); errors.Is(rerr, ackerr.NotFound) {
+		if _, rerr := rm.ReadOne(ctx, latest); isNotFound(rerr) {
 			gone = true
 			continue
 		} else if rerr != nil {
