@@ -35,7 +35,8 @@ loack -C "$WS" init --region us-east-1     # workspace root (state in .loack/)
 loack -C "$WS" apply                       # recurses network/ roles/ eks/ -> one config
 ```
 
-The EKS control plane (~10–15 min) and node group (~5–8 min) are long-running, so
-`apply` reports them "not yet converged" and you re-run after they're `ACTIVE`
-(or `aws eks wait cluster-active …`). See [loack-eks-cluster](loack-eks-cluster)
-for the staged sequence.
+The EKS control plane (~10–15 min) and node group (~5–8 min) are long-running,
+but `apply` **waits for each resource to become ready by default**, so the single
+command above blocks until the cluster and node group are `ACTIVE` — no re-runs.
+Expect the whole foundation to take ~20–25 min. See
+[loack-eks-cluster](loack-eks-cluster) for the dependency order.
