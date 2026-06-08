@@ -26,13 +26,11 @@ provisioned by loack today (the `iam` provider).
 ## Use
 
 ```sh
-mkdir -p /tmp/roles && cd /tmp/roles
-installer setup --pull /path/to/loack/packages/loack-iam-eks-roles \
-  --non-interactive --namespace stage0 --input cluster_name=eks-cluster
+installer setup --pull oci://ghcr.io/chanwit/loack-iam-eks-roles:0.1.0 \
+  --work-dir ~/roles --non-interactive --namespace eks --input cluster_name=eks-cluster
 
-cd out/manifests
-loack init --region us-east-1
-loack apply
+loack -C ~/roles init --region us-east-1
+loack -C ~/roles apply
 ```
 
 Apply after [`loack-ec2-network`](../loack-ec2-network) and before

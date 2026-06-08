@@ -28,15 +28,18 @@ Both kinds are provisioned by loack today (the `eks` provider registers
 ## Use
 
 ```sh
-mkdir -p /tmp/eks && cd /tmp/eks
-installer setup --pull /path/to/loack/packages/loack-eks-cluster \
-  --non-interactive --namespace stage0 \
+installer setup --pull oci://ghcr.io/chanwit/loack-eks-cluster:0.1.0 \
+  --work-dir ~/eks/eks --non-interactive --namespace eks \
   --input cluster_name=eks-cluster --input instance_type=m5.large --input node_count=3
 
-cd out/manifests
-loack init --region us-east-1
-loack apply
+loack -C ~/eks init --region us-east-1
+loack -C ~/eks apply
 ```
+
+Render the [network](../loack-ec2-network) and [roles](../loack-iam-eks-roles)
+packages into sibling subdirectories of the same `~/eks` workspace first, so
+loack's recursive scan provisions all three together and the `roleRef` /
+`subnetRefs` resolve.
 
 Apply **last** in the foundation sequence — its references resolve from the state
 written by [`loack-ec2-network`](../loack-ec2-network) and

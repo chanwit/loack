@@ -33,14 +33,12 @@ loack today (the `ec2` provider).
 ## Use
 
 ```sh
-mkdir -p /tmp/net && cd /tmp/net
-installer setup --pull /path/to/loack/packages/loack-ec2-network \
-  --non-interactive --namespace stage0 \
+installer setup --pull oci://ghcr.io/chanwit/loack-ec2-network:0.1.0 \
+  --work-dir ~/net --non-interactive --namespace eks \
   --input vpc_cidr=10.0.0.0/16 --input az_1=us-east-1a --input az_2=us-east-1b
 
-cd out/manifests
-loack init --region us-east-1
-loack apply
+loack -C ~/net init --region us-east-1
+loack -C ~/net apply
 ```
 
 This is the first of the EKS-foundation packages; apply it before

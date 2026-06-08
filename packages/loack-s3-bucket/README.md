@@ -57,9 +57,9 @@ loack apply
 > so the rendered directory works as-is — no stripping required.
 
 To distribute it instead of using a local path, push it as an OCI artifact and
-pull by reference. The `package-loack-s3-bucket` GitHub workflow does this
-automatically — on a push to `main` that touches this package (or via manual
-dispatch) it publishes `ghcr.io/chanwit/loack-s3-bucket:<version>` (and
+pull by reference. The `publish-packages` GitHub workflow does this for every
+package automatically — on a push to `main` that touches `packages/` (or via
+manual dispatch) it publishes `ghcr.io/chanwit/<package>:<version>` (and
 `:latest`), where `<version>` is `installerMetadata.version` from
 `installer.yaml`. To do it by hand:
 
