@@ -1,0 +1,6 @@
+apiVersion: cloudwatchlogs.services.k8s.aws/v1alpha1
+kind: LogGroup
+metadata:
+  name: loack-demo-log-group
+spec:
+  name: /loack/demo

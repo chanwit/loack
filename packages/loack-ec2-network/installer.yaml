@@ -1,0 +1,54 @@
+apiVersion: installer.confighub.com/v1alpha1
+kind: Package
+metadata:
+  name: loack-ec2-network
+installerMetadata:
+  version: 0.1.0
+spec:
+  # The VPC network for an EKS cluster: a VPC, two public + two private subnets across
+  # two AZs, an internet gateway, a NAT gateway (+ EIP), and public/private
+  # route tables. Rendered to plain KRM (ACK ec2 CRs); loack provisions it to
+  # AWS directly. Resource cross-references use `...Ref` by name, so the whole
+  # stack applies in one shot and loack resolves the IDs from state.
+  bases:
+    - name: default
+      path: bases/default
+      default: true
+      description: VPC + subnets + gateways + route tables.
+
+  # Wizard prompts, referenced as {{ .Inputs.<name> }} in transformers.
+  inputs:
+    - name: vpc_cidr
+      type: string
+      required: false
+      default: 10.0.0.0/16
+      prompt: "VPC CIDR block?"
+      description: The VPC's primary IPv4 CIDR (the subnet CIDRs below sit inside it).
+    - name: az_1
+      type: string
+      required: false
+      default: us-east-1a
+      prompt: "First availability zone?"
+      description: AZ for the -1 subnets (replaces the us-east-1a default).
+    - name: az_2
+      type: string
+      required: false
+      default: us-east-1b
+      prompt: "Second availability zone?"
+      description: AZ for the -2 subnets (replaces the us-east-1b default).
+
+  transformers:
+    - toolchain: Kubernetes/YAML
+      whereResource: "ConfigHub.ResourceType = 'ec2.services.k8s.aws/v1alpha1/VPC'"
+      description: Set the VPC CIDR from the vpc_cidr input.
+      invocations:
+        - name: yq-i
+          args: ['.spec.cidrBlocks = ["{{ .Inputs.vpc_cidr }}"]']
+    - toolchain: Kubernetes/YAML
+      whereResource: "ConfigHub.ResourceType = 'ec2.services.k8s.aws/v1alpha1/Subnet'"
+      description: Replace the placeholder AZs with the az_1 / az_2 inputs.
+      invocations:
+        - name: yq-i
+          args: ['(.spec.availabilityZone | select(. == "us-east-1a")) |= "{{ .Inputs.az_1 }}"']
+        - name: yq-i
+          args: ['(.spec.availabilityZone | select(. == "us-east-1b")) |= "{{ .Inputs.az_2 }}"']

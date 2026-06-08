@@ -1,0 +1,9 @@
+apiVersion: s3.services.k8s.aws/v1alpha1
+kind: Bucket
+metadata:
+  name: loack-s3-bucket
+spec:
+  # Placeholder; the installer's `bucket_name` input overwrites spec.name at
+  # render time (see ../../installer.yaml transformers). The value here only
+  # matters for a standalone `kustomize build` without the installer.
+  name: loack-s3-bucket-set-me

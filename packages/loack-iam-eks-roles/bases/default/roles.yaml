@@ -1,0 +1,31 @@
+# The two IAM roles an EKS cluster needs.
+#
+#   cluster-role  assumed by eks.amazonaws.com, AmazonEKSClusterPolicy
+#   node-role     assumed by ec2.amazonaws.com, worker + CNI + ECR-read policies
+#
+# `policies` attaches AWS-managed policies by ARN. metadata.name is fixed so the
+# eks package can reference these by roleRef/nodeRoleRef; spec.name (the AWS role
+# name) comes from the cluster_name input.
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Role
+metadata:
+  name: s0-cluster-role
+spec:
+  name: eks-cluster-cluster-role
+  assumeRolePolicyDocument: |
+    {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"eks.amazonaws.com"},"Action":"sts:AssumeRole"}]}
+  policies:
+    - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+---
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Role
+metadata:
+  name: s0-node-role
+spec:
+  name: eks-cluster-node-role
+  assumeRolePolicyDocument: |
+    {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}
+  policies:
+    - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+    - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+    - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly

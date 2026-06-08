@@ -1,0 +1,23 @@
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: VPC
+metadata:
+  name: loack-demo-vpc
+spec:
+  cidrBlocks:
+    - 10.42.0.0/16
+  tags:
+    - key: Name
+      value: loack-demo-vpc
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: loack-demo-subnet
+spec:
+  cidrBlock: 10.42.1.0/24
+  vpcRef:
+    from:
+      name: loack-demo-vpc
+  tags:
+    - key: Name
+      value: loack-demo-subnet

@@ -1,0 +1,6 @@
+apiVersion: sns.services.k8s.aws/v1alpha1
+kind: Topic
+metadata:
+  name: loack-demo-topic
+spec:
+  name: loack-demo-topic

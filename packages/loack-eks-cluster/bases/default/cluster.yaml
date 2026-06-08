@@ -1,0 +1,53 @@
+# An EKS control plane + a managed node group.
+#
+# Cross-package references (resolved by loack from state, so apply the network
+# and iam-eks-roles packages into the same workspace first):
+#   roleRef       -> s0-cluster-role   (loack-iam-eks-roles)
+#   subnetRefs    -> the four subnets  (loack-ec2-network)
+#   nodeRoleRef   -> s0-node-role      (loack-iam-eks-roles)
+#   clusterRef    -> s0-eks            (this package)
+apiVersion: eks.services.k8s.aws/v1alpha1
+kind: Cluster
+metadata:
+  name: s0-eks
+spec:
+  name: eks-cluster
+  roleRef:
+    from:
+      name: s0-cluster-role
+  resourcesVPCConfig:
+    endpointPublicAccess: true
+    endpointPrivateAccess: true
+    subnetRefs:
+      - from:
+          name: s0-public-1
+      - from:
+          name: s0-public-2
+      - from:
+          name: s0-private-1
+      - from:
+          name: s0-private-2
+---
+apiVersion: eks.services.k8s.aws/v1alpha1
+kind: Nodegroup
+metadata:
+  name: s0-eks-ng
+spec:
+  name: eks-cluster-ng
+  clusterRef:
+    from:
+      name: s0-eks
+  nodeRoleRef:
+    from:
+      name: s0-node-role
+  subnetRefs:
+    - from:
+        name: s0-private-1
+    - from:
+        name: s0-private-2
+  instanceTypes:
+    - m5.large
+  scalingConfig:
+    minSize: 1
+    desiredSize: 3
+    maxSize: 3

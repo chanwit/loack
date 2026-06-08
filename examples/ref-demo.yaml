@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-app-creds
+  namespace: default
+type: Opaque
+stringData:
+  password: SuperS3cret-loack-demo
+---
+apiVersion: kms.services.k8s.aws/v1alpha1
+kind: Key
+metadata:
+  name: loack-demo-key
+spec:
+  description: loack reference-resolver demo key
+---
+apiVersion: secretsmanager.services.k8s.aws/v1alpha1
+kind: Secret
+metadata:
+  name: loack-refdemo-secret
+spec:
+  name: loack-refdemo-secret
+  secretString:
+    namespace: default
+    name: my-app-creds
+    key: password
+  kmsKeyRef:
+    from:
+      name: loack-demo-key

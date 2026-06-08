@@ -1,0 +1,6 @@
+apiVersion: sqs.services.k8s.aws/v1alpha1
+kind: Queue
+metadata:
+  name: loack-demo-queue
+spec:
+  queueName: loack-demo-queue

@@ -1,0 +1,12 @@
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: VPC
+metadata:
+  name: s0-vpc
+spec:
+  cidrBlocks:
+    - 10.0.0.0/16
+  enableDNSSupport: true
+  enableDNSHostnames: true
+  tags:
+    - key: Name
+      value: eks-cluster-vpc

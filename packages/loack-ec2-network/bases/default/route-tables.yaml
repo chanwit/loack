@@ -1,0 +1,36 @@
+# Public route table (default route -> IGW) and private route table
+# (default route -> NAT gateway). Subnet<->route-table associations are not
+# modeled by the ACK ec2 RouteTable CR; associate them out of band if needed.
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: RouteTable
+metadata:
+  name: s0-public-rt
+spec:
+  vpcRef:
+    from:
+      name: s0-vpc
+  routes:
+    - destinationCIDRBlock: 0.0.0.0/0
+      gatewayRef:
+        from:
+          name: s0-igw
+  tags:
+    - key: Name
+      value: eks-cluster-public-rt
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: RouteTable
+metadata:
+  name: s0-private-rt
+spec:
+  vpcRef:
+    from:
+      name: s0-vpc
+  routes:
+    - destinationCIDRBlock: 0.0.0.0/0
+      natGatewayRef:
+        from:
+          name: s0-nat
+  tags:
+    - key: Name
+      value: eks-cluster-private-rt

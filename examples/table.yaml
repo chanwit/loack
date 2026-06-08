@@ -1,0 +1,13 @@
+apiVersion: dynamodb.services.k8s.aws/v1alpha1
+kind: Table
+metadata:
+  name: loack-demo-table
+spec:
+  tableName: loack-demo-table
+  billingMode: PAY_PER_REQUEST
+  attributeDefinitions:
+    - attributeName: id
+      attributeType: S
+  keySchema:
+    - attributeName: id
+      keyType: HASH

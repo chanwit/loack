@@ -1,0 +1,49 @@
+apiVersion: installer.confighub.com/v1alpha1
+kind: Package
+metadata:
+  name: loack-s3-bucket
+installerMetadata:
+  version: 0.1.0
+spec:
+  # A single base: an ACK S3 Bucket custom resource. The installer renders this
+  # to plain KRM YAML; loack then provisions it directly to AWS (no cluster, no
+  # ACK controller running).
+  bases:
+    - name: default
+      path: bases/default
+      default: true
+      description: A single ACK S3 Bucket.
+
+  # Optional, composable add-ons. Each is a kustomize Component that patches the
+  # bucket. Selected at install time via the wizard (`--select encryption`).
+  components:
+    - name: encryption
+      path: components/encryption
+      description: Enable default server-side encryption (SSE-S3 / AES256).
+    - name: versioning
+      path: components/versioning
+      description: Enable object versioning on the bucket.
+
+  # Wizard prompts. Referenced in transformers as {{ .Inputs.<name> }}.
+  inputs:
+    - name: bucket_name
+      type: string
+      required: true
+      prompt: "Globally-unique S3 bucket name?"
+      description: >-
+        Sets spec.name on the Bucket. S3 bucket names are global, so this must
+        be unique across all of AWS.
+
+  # Resolved-at-install-time function chain that mutates the rendered YAML before
+  # it is written. Here: write the bucket_name input into the Bucket's spec.name.
+  # (Region/account are NOT set here -- those are loack targeting concerns, given
+  # to `loack init --region ...`, not fields on the CR.)
+  transformers:
+    - toolchain: Kubernetes/YAML
+      # Scope to the Bucket only -- otherwise the function would also run against
+      # the Namespace the installer injects for the install.
+      whereResource: "ConfigHub.ResourceType = 's3.services.k8s.aws/v1alpha1/Bucket'"
+      description: Set the bucket's spec.name from the bucket_name input.
+      invocations:
+        - name: yq-i
+          args: ['.spec.name = "{{ .Inputs.bucket_name }}"']

@@ -1,0 +1,29 @@
+# controllers.lock -- pinned ACK controller clones for loack.
+#
+# loack links every wired controller into a single binary, so they MUST all
+# resolve the same ACK runtime version (and compatible aws-sdk-go-v2 / k8s.io
+# deps). Pinning exact commits keeps that set reproducible and prevents the
+# dependency graph from drifting apart.
+#
+# `make vendor`        clone/checkout each controller at its pinned commit, then
+#                      verify they all use RUNTIME below.
+# `make vendor-verify` verify existing clones without changing them.
+# `make vendor-relock` re-pin to the current clones' HEADs (fails if they no
+#                      longer share one runtime).
+#
+# Each controller is cloned from https://github.com/aws-controllers-k8s/<name>.
+# Fields: <controller-name> <commit-sha>
+
+RUNTIME v0.59.1
+
+s3-controller             3eec67ef4db504bffd9b6d0592f39bb0e4ffd361
+cloudwatchlogs-controller 0f870fb5a88e8468c016c2430b24e935eed98849
+dynamodb-controller       b0d7b7ec873fb1371fce69ecaa5fea1cbaea36a5
+ec2-controller            f5659872fa396ae6aeebccea9c50c8601c6db9e2
+ecr-controller            b6d6a0686ad1a817312576d2efafbeb2889ea21b
+eks-controller            5750730b00240e3bb0703c488ee5a6aa9bd5607a
+iam-controller            70672608e493a6a67d6790b533baea28855e1e1a
+kms-controller            00a86a3ed6730881b802f6a0e7dad55435c14570
+secretsmanager-controller e5d3f70852439edb36e3ab3de741fc7c5596c1f8
+sns-controller            331a47d4e40425ea79f1cbb9c005031c2a003bee
+sqs-controller            45926d837a9b5e538606ad4604c9bb158d4345e2

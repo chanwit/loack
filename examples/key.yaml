@@ -1,0 +1,6 @@
+apiVersion: kms.services.k8s.aws/v1alpha1
+kind: Key
+metadata:
+  name: loack-demo-key
+spec:
+  description: loack demo key

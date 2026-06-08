@@ -1,0 +1,42 @@
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: VPC
+metadata:
+  name: loack-net-vpc
+spec:
+  cidrBlocks: [10.43.0.0/16]
+  tags: [{key: Name, value: loack-net-vpc}]
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: InternetGateway
+metadata:
+  name: loack-net-igw
+spec:
+  vpcRef: {from: {name: loack-net-vpc}}
+  tags: [{key: Name, value: loack-net-igw}]
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: SecurityGroup
+metadata:
+  name: loack-net-sg
+spec:
+  name: loack-net-sg
+  description: loack network stack SG
+  vpcRef: {from: {name: loack-net-vpc}}
+  tags: [{key: Name, value: loack-net-sg}]
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: RouteTable
+metadata:
+  name: loack-net-rt
+spec:
+  vpcRef: {from: {name: loack-net-vpc}}
+  tags: [{key: Name, value: loack-net-rt}]
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: loack-net-subnet
+spec:
+  cidrBlock: 10.43.1.0/24
+  vpcRef: {from: {name: loack-net-vpc}}
+  tags: [{key: Name, value: loack-net-subnet}]

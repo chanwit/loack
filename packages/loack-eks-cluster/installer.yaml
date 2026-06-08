@@ -1,0 +1,53 @@
+apiVersion: installer.confighub.com/v1alpha1
+kind: Package
+metadata:
+  name: loack-eks-cluster
+installerMetadata:
+  version: 0.1.0
+spec:
+  # An EKS control plane (public + private API endpoints) and a managed node
+  # group, wired by reference to the roles and subnets from the other foundation
+  # packages. Rendered to plain KRM (ACK eks CRs); loack provisions both.
+  bases:
+    - name: default
+      path: bases/default
+      default: true
+      description: EKS Cluster + managed Nodegroup.
+
+  inputs:
+    - name: cluster_name
+      type: string
+      required: false
+      default: eks-cluster
+      prompt: "EKS cluster name?"
+      description: The AWS name of the cluster (spec.name); also prefixes the node group.
+    - name: instance_type
+      type: string
+      required: false
+      default: m5.large
+      prompt: "Node group instance type?"
+      description: EC2 instance type for the managed node group.
+    - name: node_count
+      type: string
+      required: false
+      default: "3"
+      prompt: "Node group desired size?"
+      description: Desired (and max) node count; min stays 1.
+
+  transformers:
+    - toolchain: Kubernetes/YAML
+      whereResource: "ConfigHub.ResourceType = 'eks.services.k8s.aws/v1alpha1/Cluster'"
+      description: Set the cluster's AWS name from cluster_name.
+      invocations:
+        - name: yq-i
+          args: ['.spec.name = "{{ .Inputs.cluster_name }}"']
+    - toolchain: Kubernetes/YAML
+      whereResource: "ConfigHub.ResourceType = 'eks.services.k8s.aws/v1alpha1/Nodegroup'"
+      description: Set the node group name, instance type, and size from inputs.
+      invocations:
+        - name: yq-i
+          args: ['.spec.name = "{{ .Inputs.cluster_name }}-ng"']
+        - name: yq-i
+          args: ['.spec.instanceTypes = ["{{ .Inputs.instance_type }}"]']
+        - name: yq-i
+          args: ['.spec.scalingConfig.desiredSize = {{ .Inputs.node_count }} | .spec.scalingConfig.maxSize = {{ .Inputs.node_count }}']

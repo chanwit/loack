@@ -1,0 +1,37 @@
+# Internet gateway (egress for public subnets) + a NAT gateway with an Elastic
+# IP in the first public subnet (egress for private subnets).
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: InternetGateway
+metadata:
+  name: s0-igw
+spec:
+  vpcRef:
+    from:
+      name: s0-vpc
+  tags:
+    - key: Name
+      value: eks-cluster-igw
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: ElasticIPAddress
+metadata:
+  name: s0-nat-eip
+spec:
+  tags:
+    - key: Name
+      value: eks-cluster-nat-eip
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: NATGateway
+metadata:
+  name: s0-nat
+spec:
+  subnetRef:
+    from:
+      name: s0-public-1
+  allocationRef:
+    from:
+      name: s0-nat-eip
+  tags:
+    - key: Name
+      value: eks-cluster-nat

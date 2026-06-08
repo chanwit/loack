@@ -1,0 +1,36 @@
+apiVersion: installer.confighub.com/v1alpha1
+kind: Package
+metadata:
+  name: loack-iam-eks-roles
+installerMetadata:
+  version: 0.1.0
+spec:
+  # The two IAM roles an EKS cluster needs: the cluster role and the node role,
+  # each with its trust policy and AWS-managed policy attachments. Rendered to
+  # plain KRM (ACK iam Role CRs); loack provisions them directly.
+  bases:
+    - name: default
+      path: bases/default
+      default: true
+      description: EKS cluster IAM role + worker-node IAM role.
+
+  inputs:
+    - name: cluster_name
+      type: string
+      required: false
+      default: eks-cluster
+      prompt: "Cluster name (prefix for the IAM role names)?"
+      description: >-
+        Sets the AWS role names to <cluster_name>-cluster-role and
+        <cluster_name>-node-role. The CR metadata names stay fixed so the eks
+        package can reference these roles.
+
+  transformers:
+    - toolchain: Kubernetes/YAML
+      whereResource: "ConfigHub.ResourceType = 'iam.services.k8s.aws/v1alpha1/Role'"
+      description: Name the roles from cluster_name (cluster-role / node-role kept distinct).
+      invocations:
+        - name: yq-i
+          args: ['(.spec.name | select(. == "eks-cluster-cluster-role")) |= "{{ .Inputs.cluster_name }}-cluster-role"']
+        - name: yq-i
+          args: ['(.spec.name | select(. == "eks-cluster-node-role")) |= "{{ .Inputs.cluster_name }}-node-role"']

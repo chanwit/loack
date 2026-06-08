@@ -1,0 +1,11 @@
+apiVersion: eks.services.k8s.aws/v1alpha1
+kind: Cluster
+metadata:
+  name: loack-demo-eks
+spec:
+  name: loack-demo-eks
+  roleARN: arn:aws:iam::111122223333:role/loack-demo-eks-role
+  resourcesVPCConfig:
+    subnetIDs:
+      - subnet-aaaa1111
+      - subnet-bbbb2222

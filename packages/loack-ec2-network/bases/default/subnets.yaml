@@ -1,0 +1,69 @@
+# Two public + two private /20 subnets across two AZs for an EKS cluster.
+# Public subnets carry kubernetes.io/role/elb and private subnets
+# kubernetes.io/role/internal-elb so EKS can place public/internal load
+# balancers. Default AZs are us-east-1a/b; the az_1/az_2 inputs replace them.
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: s0-public-1
+spec:
+  cidrBlock: 10.0.0.0/20
+  availabilityZone: us-east-1a
+  mapPublicIPOnLaunch: true
+  vpcRef:
+    from:
+      name: s0-vpc
+  tags:
+    - key: Name
+      value: eks-cluster-public-1
+    - key: kubernetes.io/role/elb
+      value: "1"
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: s0-public-2
+spec:
+  cidrBlock: 10.0.16.0/20
+  availabilityZone: us-east-1b
+  mapPublicIPOnLaunch: true
+  vpcRef:
+    from:
+      name: s0-vpc
+  tags:
+    - key: Name
+      value: eks-cluster-public-2
+    - key: kubernetes.io/role/elb
+      value: "1"
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: s0-private-1
+spec:
+  cidrBlock: 10.0.128.0/20
+  availabilityZone: us-east-1a
+  vpcRef:
+    from:
+      name: s0-vpc
+  tags:
+    - key: Name
+      value: eks-cluster-private-1
+    - key: kubernetes.io/role/internal-elb
+      value: "1"
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: s0-private-2
+spec:
+  cidrBlock: 10.0.144.0/20
+  availabilityZone: us-east-1b
+  vpcRef:
+    from:
+      name: s0-vpc
+  tags:
+    - key: Name
+      value: eks-cluster-private-2
+    - key: kubernetes.io/role/internal-elb
+      value: "1"

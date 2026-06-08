@@ -1,0 +1,39 @@
+# Multi-provider dispatch demo.
+#
+# Two resources whose controllers live in SEPARATE provider modules:
+#
+#   Bucket -> providers/s3   (loack-provider-s3)
+#   Role   -> providers/iam  (loack-provider-iam)
+#
+# The split core links no controllers and no runtime; it dispatches each
+# resource to the provider that owns its API group, over the provider protocol.
+# So one `apply` drives two independent provider processes.
+#
+#   make core providers
+#   cd examples-workdir && cp ../examples/runtime-independence.yaml .
+#   ../bin/loack-core apply        # auto-discovers bin/loack-provider-{s3,iam}
+#
+# The core picks the provider by API group: s3.services.k8s.aws -> the
+# loack-provider-s3 binary, iam.services.k8s.aws -> loack-provider-iam. Set
+# LOACK_PROVIDERS=<bin>:<bin> to pin an explicit set instead of discovering.
+#
+# All providers currently pin runtime v0.59.1. Because each provider is its own
+# Go module, any one of them CAN pin a different runtime (a `replace ... runtime
+# => ... vX` in its go.mod) without affecting the core or the others -- that is
+# the runtime-independence property; uniform v0.59.1 is just the default set.
+---
+apiVersion: s3.services.k8s.aws/v1alpha1
+kind: Bucket
+metadata:
+  name: loack-rtdemo
+spec:
+  name: loack-rtdemo-bucket
+---
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Role
+metadata:
+  name: loack-rtdemo
+spec:
+  name: loack-rtdemo-role
+  assumeRolePolicyDocument: |
+    {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}

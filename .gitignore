@@ -1,0 +1,31 @@
+# build artifacts
+/bin/
+
+# loack working directory (state, backups, config) and saved plans
+.loack/
+*.loack
+tfplan
+*.tfplan
+
+# legacy state files (state now lives under .loack/)
+loack.state.json
+loack.state.json.backup
+
+# workspace tooling
+.memsearch/
+
+# Vendored ACK controller clones. These are cloned locally for the `replace`
+# directives in go.mod (see PORT_GUIDELINE.md) and are NOT part of this repo.
+/*-controller/
+/runtime/
+/code-generator/
+/community/
+/test-infra/
+/dev-tools/
+/ack-chart/
+
+# release build output
+/dist/
+
+# local scratch
+/sandbox/
