@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -52,47 +53,60 @@ func (d manifestDoc) display() string {
 // referenced resources come before the resources that reference them. It also
 // returns the CARM targeting declared by any Kubernetes Namespaces (keyed by
 // namespace name), used to route resources to per-namespace accounts/regions.
-// manifestFiles returns the manifest files to gather: the union of every -f
-// path (a directory contributes its *.yaml/*.yml files; a file contributes
-// itself), or the working directory's *.yaml/*.yml when no -f is given. This is
-// what lets one command provision several packages' rendered manifests without
-// copying them into a single directory.
+// manifestFiles returns every manifest under the workspace root (the current
+// directory, after any -C). It recurses the tree like Terraform treats its root
+// module, but because KRM is flat data with global references, the whole tree is
+// one configuration -- no module wiring needed. So you render each installer
+// package into its own subdirectory and loack picks them all up; no copy step.
+//
+// Discovery rule, per directory:
+//   - a directory holding an "out/manifests/" subdir is an installer render:
+//     read only out/manifests/*.yaml and skip the rest of that subtree (its
+//     un-rendered package/ source and out/spec/ staging);
+//   - otherwise read the directory's own *.yaml/*.yml and keep descending.
+// Hidden directories (".loack/", etc.) are always skipped.
 func manifestFiles() ([]string, error) {
-	yamlIn := func(dir string) ([]string, error) {
+	yamlIn := func(dir string, files *[]string) error {
 		entries, err := os.ReadDir(dir)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		var out []string
 		for _, e := range entries {
 			if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
 				continue
 			}
 			if ext := filepath.Ext(e.Name()); ext == ".yaml" || ext == ".yml" {
-				out = append(out, filepath.Join(dir, e.Name()))
+				*files = append(*files, filepath.Join(dir, e.Name()))
 			}
 		}
-		return out, nil
+		return nil
+	}
+	hasRendered := func(dir string) bool {
+		fi, err := os.Stat(filepath.Join(dir, "out", "manifests"))
+		return err == nil && fi.IsDir()
 	}
 
 	var files []string
-	if len(rootArgs.files) == 0 {
-		return func() ([]string, error) { f, err := yamlIn("."); sort.Strings(f); return f, err }()
-	}
-	for _, p := range rootArgs.files {
-		fi, err := os.Stat(p)
+	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil, err
+			return err
 		}
-		if fi.IsDir() {
-			f, err := yamlIn(p)
-			if err != nil {
-				return nil, err
+		if !d.IsDir() {
+			return nil // files are collected per-directory below
+		}
+		if path != "." && strings.HasPrefix(filepath.Base(path), ".") {
+			return fs.SkipDir // .loack and other hidden dirs
+		}
+		if hasRendered(path) {
+			if e := yamlIn(filepath.Join(path, "out", "manifests"), &files); e != nil {
+				return e
 			}
-			files = append(files, f...)
-		} else {
-			files = append(files, p)
+			return fs.SkipDir // don't descend into package/ source or out/spec
 		}
+		return yamlIn(path, &files)
+	})
+	if err != nil {
+		return nil, err
 	}
 	sort.Strings(files)
 	return files, nil

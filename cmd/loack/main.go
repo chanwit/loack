@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -28,10 +27,13 @@ var rootCmd = &cobra.Command{
 	Short: "Controller-less provisioner for ACK (AWS Controllers for Kubernetes) resources",
 	Long: `loack provisions cloud resources from ACK custom resources, Terraform-style.
 
-The YAML manifests in the working directory are the desired configuration. Run
-'loack init' once, then 'loack plan' / 'loack apply' / 'loack destroy'. loack
-reuses each ACK controller's generated resource manager to reconcile against the
-AWS API -- no controller, no Kubernetes cluster.`,
+Run 'loack init' once at a workspace root (use -C to pick one without cd'ing),
+then 'loack plan' / 'loack apply' / 'loack destroy'. The desired configuration is
+every manifest in the tree under the root: loack recurses it, reading the
+out/manifests/ of any installer-rendered package and plain *.yaml elsewhere, so
+several packages rendered into subdirectories are one configuration -- no copying
+and no -f. loack reuses each ACK controller's generated resource manager to
+reconcile against the AWS API; no controller, no Kubernetes cluster.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }
@@ -43,7 +45,6 @@ type rootFlags struct {
 	partition string
 	state     string
 	chdir     string
-	files     []string
 }
 
 var rootArgs rootFlags
@@ -58,21 +59,11 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&rootArgs.state, "state", state.DefaultPath,
 		"path to the loack state file")
 	rootCmd.PersistentFlags().StringVarP(&rootArgs.chdir, "chdir", "C", "",
-		"run as if loack was started in this directory (state and default manifests resolve here)")
-	rootCmd.PersistentFlags().StringArrayVarP(&rootArgs.files, "file", "f", nil,
-		"read manifests from this file or directory instead of the working directory (repeatable)")
+		"treat this directory as the workspace root (state lives here; manifests are gathered from the tree under it)")
 
-	// Resolve -f paths against the invocation directory, then honor -C, so a
-	// single command can target a workspace and pull manifests from several
-	// package render dirs without cd'ing or copying.
+	// Honor -C: treat the given directory as the workspace root for everything
+	// that follows (state in .loack/, and the recursive manifest scan).
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		for i, p := range rootArgs.files {
-			abs, err := filepath.Abs(p)
-			if err != nil {
-				return err
-			}
-			rootArgs.files[i] = abs
-		}
 		if rootArgs.chdir != "" {
 			// The workspace dir may not exist yet (e.g. `loack -C ~/eks init`);
 			// create it so init can lay down .loack/ there.
