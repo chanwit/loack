@@ -52,21 +52,57 @@ func (d manifestDoc) display() string {
 // referenced resources come before the resources that reference them. It also
 // returns the CARM targeting declared by any Kubernetes Namespaces (keyed by
 // namespace name), used to route resources to per-namespace accounts/regions.
-func gatherDocs() ([]manifestDoc, map[string]nsTarget, error) {
-	entries, err := os.ReadDir(".")
-	if err != nil {
-		return nil, nil, err
-	}
-	var files []string
-	for _, e := range entries {
-		if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
-			continue
+// manifestFiles returns the manifest files to gather: the union of every -f
+// path (a directory contributes its *.yaml/*.yml files; a file contributes
+// itself), or the working directory's *.yaml/*.yml when no -f is given. This is
+// what lets one command provision several packages' rendered manifests without
+// copying them into a single directory.
+func manifestFiles() ([]string, error) {
+	yamlIn := func(dir string) ([]string, error) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return nil, err
 		}
-		if ext := filepath.Ext(e.Name()); ext == ".yaml" || ext == ".yml" {
-			files = append(files, e.Name())
+		var out []string
+		for _, e := range entries {
+			if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+				continue
+			}
+			if ext := filepath.Ext(e.Name()); ext == ".yaml" || ext == ".yml" {
+				out = append(out, filepath.Join(dir, e.Name()))
+			}
+		}
+		return out, nil
+	}
+
+	var files []string
+	if len(rootArgs.files) == 0 {
+		return func() ([]string, error) { f, err := yamlIn("."); sort.Strings(f); return f, err }()
+	}
+	for _, p := range rootArgs.files {
+		fi, err := os.Stat(p)
+		if err != nil {
+			return nil, err
+		}
+		if fi.IsDir() {
+			f, err := yamlIn(p)
+			if err != nil {
+				return nil, err
+			}
+			files = append(files, f...)
+		} else {
+			files = append(files, p)
 		}
 	}
 	sort.Strings(files)
+	return files, nil
+}
+
+func gatherDocs() ([]manifestDoc, map[string]nsTarget, error) {
+	files, err := manifestFiles()
+	if err != nil {
+		return nil, nil, err
+	}
 
 	var docs []manifestDoc
 	carm := map[string]nsTarget{}

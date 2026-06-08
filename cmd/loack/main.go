@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -35,12 +36,14 @@ AWS API -- no controller, no Kubernetes cluster.`,
 	SilenceErrors: true,
 }
 
-// rootFlags are the AWS targeting options shared by every subcommand.
+// rootFlags are the options shared by every subcommand.
 type rootFlags struct {
 	region    string
 	account   string
 	partition string
 	state     string
+	chdir     string
+	files     []string
 }
 
 var rootArgs rootFlags
@@ -54,6 +57,34 @@ func init() {
 		"AWS partition")
 	rootCmd.PersistentFlags().StringVar(&rootArgs.state, "state", state.DefaultPath,
 		"path to the loack state file")
+	rootCmd.PersistentFlags().StringVarP(&rootArgs.chdir, "chdir", "C", "",
+		"run as if loack was started in this directory (state and default manifests resolve here)")
+	rootCmd.PersistentFlags().StringArrayVarP(&rootArgs.files, "file", "f", nil,
+		"read manifests from this file or directory instead of the working directory (repeatable)")
+
+	// Resolve -f paths against the invocation directory, then honor -C, so a
+	// single command can target a workspace and pull manifests from several
+	// package render dirs without cd'ing or copying.
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		for i, p := range rootArgs.files {
+			abs, err := filepath.Abs(p)
+			if err != nil {
+				return err
+			}
+			rootArgs.files[i] = abs
+		}
+		if rootArgs.chdir != "" {
+			// The workspace dir may not exist yet (e.g. `loack -C ~/eks init`);
+			// create it so init can lay down .loack/ there.
+			if err := os.MkdirAll(rootArgs.chdir, 0o755); err != nil {
+				return fmt.Errorf("creating workspace %s: %w", rootArgs.chdir, err)
+			}
+			if err := os.Chdir(rootArgs.chdir); err != nil {
+				return fmt.Errorf("chdir %s: %w", rootArgs.chdir, err)
+			}
+		}
+		return nil
+	}
 }
 
 // stateRefs returns a snapshot of every recorded object keyed by address. The
