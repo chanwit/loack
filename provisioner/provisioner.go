@@ -18,8 +18,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	smithy "github.com/aws/smithy-go"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/yaml"
 
 	ackv1alpha1 "github.com/aws-controllers-k8s/runtime/apis/core/v1alpha1"
@@ -334,7 +334,7 @@ func (t *Target) Apply(ctx context.Context, rm acktypes.AWSResourceManager, hook
 	for time.Now().Before(deadline) {
 		observed, err := rm.ReadOne(ctx, current)
 		switch {
-		case errors.Is(err, ackerr.NotFound):
+		case isNotFound(err):
 			if !creating {
 				emit(hook, EventCreating, addr, "")
 				creating = true
@@ -522,7 +522,7 @@ func sleep(ctx context.Context, d time.Duration) error {
 // Get returns the currently-observed AWS state of the resource.
 func (t *Target) Get(ctx context.Context, rm acktypes.AWSResourceManager) (*Result, error) {
 	latest, err := rm.ReadOne(ctx, t.desired)
-	if errors.Is(err, ackerr.NotFound) {
+	if isNotFound(err) {
 		return &Result{Action: ActionAbsent}, nil
 	}
 	if err != nil {
@@ -740,7 +740,7 @@ func (t *Target) Desired() AWSResource { return t.desired }
 // live state and diffs it against the effective desired state.
 func (t *Target) Plan(ctx context.Context, rm acktypes.AWSResourceManager) (*Plan, error) {
 	live, err := rm.ReadOne(ctx, t.desired)
-	if errors.Is(err, ackerr.NotFound) {
+	if isNotFound(err) {
 		return &Plan{Address: t.Address(), Kind: PlanCreate}, nil
 	}
 	if err != nil {

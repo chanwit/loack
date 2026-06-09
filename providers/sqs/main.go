@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os"
 
+	iamapis "github.com/aws-controllers-k8s/iam-controller/apis/v1alpha1"
+	kmsapis "github.com/aws-controllers-k8s/kms-controller/apis/v1alpha1"
 	sqsapis "github.com/aws-controllers-k8s/sqs-controller/apis/v1alpha1"
 	sqsresource "github.com/aws-controllers-k8s/sqs-controller/pkg/resource"
 	_ "github.com/aws-controllers-k8s/sqs-controller/pkg/resource/queue"
@@ -21,6 +23,11 @@ import (
 func main() {
 	provisioner.Register(sqsresource.GetManagerFactories)
 	provisioner.RegisterScheme(sqsapis.AddToScheme)
+	// A Queue references iam Roles (redrive/policy) and a kms Key
+	// (kmsMasterKeyRef); resolving them needs those apis in loack's ref scheme
+	// (see the split-provider note in eks).
+	provisioner.RegisterScheme(iamapis.AddToScheme)
+	provisioner.RegisterScheme(kmsapis.AddToScheme)
 
 	if err := provider.Serve(provisioner.NewLocal()); err != nil {
 		fmt.Fprintln(os.Stderr, "loack-provider-sqs:", err)

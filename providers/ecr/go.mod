@@ -10,7 +10,9 @@ require (
 )
 
 require (
+	github.com/aws-controllers-k8s/iam-controller v1.6.2
 	github.com/aws-controllers-k8s/runtime v0.59.1 // indirect
+	github.com/aws-controllers-k8s/secretsmanager-controller v1.1.0
 	github.com/aws/aws-sdk-go v1.55.5 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.5 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.28.6 // indirect
@@ -97,3 +99,7 @@ replace loack => ../..
 // Pin every controller in this provider's closure to the vendored clone, so
 // builds are reproducible and all resolve the same runtime (v0.59.1).
 replace github.com/aws-controllers-k8s/ecr-controller => ../../ecr-controller
+
+replace github.com/aws-controllers-k8s/iam-controller => ../../iam-controller
+
+replace github.com/aws-controllers-k8s/secretsmanager-controller => ../../secretsmanager-controller

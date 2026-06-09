@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 
+	kmsapis "github.com/aws-controllers-k8s/kms-controller/apis/v1alpha1"
 	smapis "github.com/aws-controllers-k8s/secretsmanager-controller/apis/v1alpha1"
 	smresource "github.com/aws-controllers-k8s/secretsmanager-controller/pkg/resource"
 	_ "github.com/aws-controllers-k8s/secretsmanager-controller/pkg/resource/secret"
@@ -21,6 +22,9 @@ import (
 func main() {
 	provisioner.Register(smresource.GetManagerFactories)
 	provisioner.RegisterScheme(smapis.AddToScheme)
+	// A Secret's kmsKeyRef -> a kms Key; resolving it needs the kms apis in
+	// loack's ref scheme (see the split-provider note in eks).
+	provisioner.RegisterScheme(kmsapis.AddToScheme)
 
 	if err := provider.Serve(provisioner.NewLocal()); err != nil {
 		fmt.Fprintln(os.Stderr, "loack-provider-secretsmanager:", err)

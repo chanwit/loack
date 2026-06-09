@@ -13,6 +13,8 @@ import (
 	ecrapis "github.com/aws-controllers-k8s/ecr-controller/apis/v1alpha1"
 	ecrresource "github.com/aws-controllers-k8s/ecr-controller/pkg/resource"
 	_ "github.com/aws-controllers-k8s/ecr-controller/pkg/resource/repository"
+	iamapis "github.com/aws-controllers-k8s/iam-controller/apis/v1alpha1"
+	smapis "github.com/aws-controllers-k8s/secretsmanager-controller/apis/v1alpha1"
 
 	"loack/provider"
 	"loack/provisioner"
@@ -21,6 +23,11 @@ import (
 func main() {
 	provisioner.Register(ecrresource.GetManagerFactories)
 	provisioner.RegisterScheme(ecrapis.AddToScheme)
+	// ecr resources reference iam Roles and secretsmanager Secrets (pull-through
+	// cache / replication credentials); resolving them needs those apis in
+	// loack's ref scheme (see the split-provider note in eks).
+	provisioner.RegisterScheme(iamapis.AddToScheme)
+	provisioner.RegisterScheme(smapis.AddToScheme)
 
 	if err := provider.Serve(provisioner.NewLocal()); err != nil {
 		fmt.Fprintln(os.Stderr, "loack-provider-ecr:", err)

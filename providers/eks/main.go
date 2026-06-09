@@ -16,6 +16,7 @@ import (
 	_ "github.com/aws-controllers-k8s/eks-controller/pkg/resource/cluster"
 	_ "github.com/aws-controllers-k8s/eks-controller/pkg/resource/nodegroup"
 	iamapis "github.com/aws-controllers-k8s/iam-controller/apis/v1alpha1"
+	kmsapis "github.com/aws-controllers-k8s/kms-controller/apis/v1alpha1"
 
 	"loack/provider"
 	"loack/provisioner"
@@ -24,13 +25,15 @@ import (
 func main() {
 	provisioner.Register(eksresource.GetManagerFactories)
 	// The eks Cluster/Nodegroup carry cross-service references — subnetRefs to
-	// ec2 Subnets and roleRef/nodeRoleRef to iam Roles. Resolving them needs
-	// those foreign types in loack's ref scheme, not just the eks apis. (In the
-	// all-in-one binary every controller's apis are registered, which is why
-	// this only surfaces in the split provider.)
+	// ec2 Subnets, roleRef/nodeRoleRef to iam Roles, and the cluster's
+	// encryptionConfig keyRef to a kms Key. Resolving them needs those foreign
+	// types in loack's ref scheme, not just the eks apis. (In the all-in-one
+	// binary every controller's apis are registered, which is why this only
+	// surfaces in the split provider.)
 	provisioner.RegisterScheme(eksapis.AddToScheme)
 	provisioner.RegisterScheme(ec2apis.AddToScheme)
 	provisioner.RegisterScheme(iamapis.AddToScheme)
+	provisioner.RegisterScheme(kmsapis.AddToScheme)
 
 	if err := provider.Serve(provisioner.NewLocal()); err != nil {
 		fmt.Fprintln(os.Stderr, "loack-provider-eks:", err)

@@ -25,6 +25,7 @@ import (
 	_ "github.com/aws-controllers-k8s/ec2-controller/pkg/resource/vpc"
 	_ "github.com/aws-controllers-k8s/ec2-controller/pkg/resource/vpc_endpoint"
 	_ "github.com/aws-controllers-k8s/ec2-controller/pkg/resource/vpc_peering_connection"
+	iamapis "github.com/aws-controllers-k8s/iam-controller/apis/v1alpha1"
 
 	"loack/provider"
 	"loack/provisioner"
@@ -33,6 +34,10 @@ import (
 func main() {
 	provisioner.Register(ec2resource.GetManagerFactories)
 	provisioner.RegisterScheme(ec2apis.AddToScheme)
+	// Some ec2 resources reference an iam Role (e.g. a VPC flow log's
+	// deliverLogsPermissionArnRef); resolving it needs the iam apis in loack's
+	// ref scheme (see the split-provider note in eks).
+	provisioner.RegisterScheme(iamapis.AddToScheme)
 
 	if err := provider.Serve(provisioner.NewLocal()); err != nil {
 		fmt.Fprintln(os.Stderr, "loack-provider-ec2:", err)

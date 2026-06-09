@@ -10,6 +10,7 @@ require (
 )
 
 require (
+	github.com/aws-controllers-k8s/iam-controller v1.6.2
 	github.com/aws-controllers-k8s/runtime v0.59.1 // indirect
 	github.com/aws/aws-sdk-go v1.55.5 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.5 // indirect
@@ -99,3 +100,5 @@ replace loack => ../..
 // Pin every controller in this provider's closure to the vendored clone, so
 // builds are reproducible and all resolve the same runtime (v0.59.1).
 replace github.com/aws-controllers-k8s/ec2-controller => ../../ec2-controller
+
+replace github.com/aws-controllers-k8s/iam-controller => ../../iam-controller
